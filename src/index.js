@@ -6,8 +6,9 @@
  */
 
 import puppeteer from "@cloudflare/puppeteer";
-import { handleRpc, clampNumber, SERVER_INFO, TOOLS } from "./protocol.js";
+import { handleRpc, clampNumber, classifyFailure, SERVER_INFO, TOOLS } from "./protocol.js";
 import { inspectInPage, verdictFor } from "./inspect-page.js";
+import { usageKey, summarise, formatSummary } from "./usage.js";
 
 /** Browser work costs money and time, so cap it hard. */
 const NAV_TIMEOUT_MS = 20000;
@@ -15,6 +16,10 @@ const SELECTOR_TIMEOUT_MS = 8000;
 
 // Pinned so an upstream change can never alter audit results silently.
 const AXE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js";
+
+// Counter records expire on their own, so the store never needs tending.
+const USAGE_TTL_S = 90 * 24 * 60 * 60;
+const USAGE_MAX_PAGES = 10;
 
 function json(body, status = 200, extra = {}) {
   return new Response(JSON.stringify(body), {
@@ -351,6 +356,47 @@ async function runTool(name, args, env) {
   return toolText(`Tool "${name}" is not implemented.`, true);
 }
 
+/**
+ * Count one tool call. Deliberately records nothing about *what* was requested.
+ *
+ * Three fields only: which tool ran, how it ended, and how long it took. No URL,
+ * no IP address, no headers, no page content — none of it is passed to this
+ * function, so none of it can be recorded by mistake. That keeps the privacy
+ * promise in the README literally true rather than true-by-intention.
+ *
+ * The reason it exists at all: two live assets, no revenue, and no way to tell
+ * whether anything uses them. Every decision left — pay for more browser time,
+ * add per-call pricing, promote it, or retire it — depends on a number nobody
+ * currently has. Never throws: a counter must not be able to break a render.
+ */
+function count(env, ctx, tool, outcome, ms) {
+  try {
+    if (!env.USAGE) return; // absent in local dev and in tests
+    const key = usageKey(tool, outcome, ms, new Date(), crypto.randomUUID().slice(0, 8));
+    // waitUntil so counting never delays the agent's response, and expirationTtl
+    // so the store prunes itself rather than growing without bound.
+    const write = env.USAGE.put(key, "", { expirationTtl: USAGE_TTL_S }).catch(() => {});
+    if (ctx && typeof ctx.waitUntil === "function") ctx.waitUntil(write);
+  } catch {
+    // Telemetry is never worth failing a request over.
+  }
+}
+
+/** List every counter key, bounded so a huge store can't stall the response. */
+async function readUsage(env) {
+  const names = [];
+  let cursor;
+  let truncated = false;
+  for (let page = 0; page < USAGE_MAX_PAGES; page++) {
+    const res = await env.USAGE.list({ prefix: "c:", limit: 1000, cursor });
+    for (const k of res.keys) names.push(k.name);
+    if (res.list_complete) { cursor = undefined; break; }
+    cursor = res.cursor;
+    if (page === USAGE_MAX_PAGES - 1) truncated = true;
+  }
+  return { names, truncated };
+}
+
 /** Chunked so a large screenshot doesn't blow the call stack via spread. */
 function bytesToBase64(buf) {
   const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
@@ -363,7 +409,7 @@ function bytesToBase64(buf) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
     if (request.method === "OPTIONS") {
@@ -377,6 +423,14 @@ export default {
       });
     }
 
+    // Readable without an API token or a script: open it in a browser.
+    if (request.method === "GET" && url.pathname === "/stats") {
+      if (!env.USAGE) { return new Response("Usage counting is not configured.", { status: 503 }); }
+      const { names, truncated } = await readUsage(env);
+      return new Response(formatSummary(summarise(names), { truncated }), {
+        headers: { "content-type": "text/plain; charset=utf-8", "access-control-allow-origin": "*" }
+      });
+    }
     // A human landing on the URL should learn what this is.
     if (request.method === "GET" && url.pathname !== "/mcp") {
       return json({
@@ -419,23 +473,30 @@ export default {
       if (out === null) continue; // notification
 
       if (out && out.defer) {
+        const started = Date.now();
         try {
           const result = await runTool(out.defer, out.args, env);
+          // A tool can succeed at the protocol level and still report a failure —
+          // an invalid selector, say. Counting those as "ok" would overstate how
+          // well the server works, so they get their own outcome.
+          count(env, ctx, out.defer, result.isError ? "tool_error" : "ok", Date.now() - started);
           responses.push({ jsonrpc: "2.0", id: out.id, result });
         } catch (err) {
           // Browser failures are the agent's problem to route around, not a crash.
           // Tell it *which* problem: our capacity or the page. Blaming the page for
           // our rate limit makes an agent abandon a URL that was fine.
-          const raw = String(err?.message || err);
-          const isCapacity = /429|rate limit|too many|concurrent|unable to create new browser/i.test(raw);
-          const text = isCapacity
-            ? `This server is at its rendering capacity right now, so ${out.args.url} was not attempted. ` +
-              `Nothing is wrong with the URL — wait a few seconds and retry.`
-            : `Could not render ${out.args.url}. ${raw}. ` +
-              `The page may be slow, unreachable, or require a login.`;
-          responses.push({ jsonrpc: "2.0", id: out.id, result: toolText(text, true) });
+          const f = classifyFailure(err?.message || err, out.args.url);
+          count(env, ctx, out.defer, f.label, Date.now() - started);
+          responses.push({ jsonrpc: "2.0", id: out.id, result: toolText(f.message, true) });
         }
         continue;
+      }
+
+      // A call rejected by validation never reaches the deferred path, so without
+      // this it would go uncounted — and "agents keep calling this wrong" is worth
+      // knowing, not least because it usually means a tool description is unclear.
+      if (rpc?.method === "tools/call" && out?.result?.isError) {
+        count(env, ctx, rpc?.params?.name || "unknown", "bad_request", 0);
       }
 
       responses.push(out);
