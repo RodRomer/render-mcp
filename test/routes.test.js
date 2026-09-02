@@ -12,7 +12,7 @@
  * the whole table rather than a check of one path.
  */
 
-import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, INDEXNOW_KEY, FAVICON_SVG } from "../src/routes.js";
+import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, privacyHtml, INDEXNOW_KEY, FAVICON_SVG } from "../src/routes.js";
 
 let pass = 0;
 let fail = 0;
@@ -77,12 +77,26 @@ check("ends with a newline", r.endsWith("\n"), true);
 section("6. sitemap.xml");
 const s = sitemapXml();
 check("declares the xml prolog", s.startsWith('<?xml version="1.0" encoding="UTF-8"?>'), true);
-check("lists both real pages", (s.match(/<loc>/g) || []).length, 2);
+check("lists all three real pages", (s.match(/<loc>/g) || []).length, 3);
 check("includes the landing page", s.includes("<loc>https://render.makermargins.com/</loc>"), true);
 check("includes the stats page", s.includes("<loc>https://render.makermargins.com/stats</loc>"), true);
 // The MCP endpoint is not a page; listing it would send crawlers at a 405.
 check("does not list the rpc endpoint", s.includes("/mcp<"), false);
 check("every url is absolute", (s.match(/<loc>(?!https:\/\/)/g) || []).length, 0);
+
+section("6b. The privacy page");
+// A directory submission cites this by URL, so it must exist and must match what
+// the code actually does — the three recorded fields and nothing else.
+check("privacy routes", resolveRoute("GET", "/privacy", "").kind, "privacy");
+const pv = privacyHtml();
+check("states that urls are never stored", pv.includes("never stored or logged"), true);
+check("names all three recorded fields",
+  pv.includes("Which tool ran") && pv.includes("How it ended") && pv.includes("how long it took"), true);
+check("states the IP address is not recorded", pv.includes("Your IP address"), true);
+check("links the public counter", pv.includes("/stats"), true);
+check("declares no accounts or credentials", pv.includes("no API key"), true);
+check("has a canonical", pv.includes('rel="canonical"'), true);
+check("is listed in the sitemap", sitemapXml().includes("/privacy"), true);
 
 section("7. The 404 page");
 const nf = notFoundHtml();
