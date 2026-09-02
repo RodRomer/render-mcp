@@ -51,6 +51,10 @@ export function resolveRoute(method, pathname, accept = "") {
       return { kind: "method-not-allowed" };
     case "/stats":
       return { kind: "stats" };
+    case "/privacy":
+      // A directory submission asks for a privacy policy URL, and this server
+      // does record three fields — so it needs a real page, not a homepage anchor.
+      return { kind: "privacy" };
     case "/robots.txt":
       return { kind: "robots" };
     case "/sitemap.xml":
@@ -92,7 +96,8 @@ export function robotsTxt(origin = "https://render.makermargins.com") {
 export function sitemapXml(origin = "https://render.makermargins.com", lastmod = "2026-09-02") {
   const urls = [
     { loc: `${origin}/`, priority: "1.0" },
-    { loc: `${origin}/stats`, priority: "0.3" }
+    { loc: `${origin}/stats`, priority: "0.3" },
+    { loc: `${origin}/privacy`, priority: "0.3" }
   ];
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -141,6 +146,88 @@ export function notFoundHtml(origin = "https://render.makermargins.com") {
     <p>The MCP endpoint itself is <code>${origin}/mcp</code>, and it answers
        JSON-RPC over POST — a browser cannot usefully open it.</p>
   </div>
+</body>
+</html>
+`;
+}
+
+/** The privacy position, stated as a page so it can be cited by a URL. */
+export function privacyHtml(origin = "https://render.makermargins.com") {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — render-mcp</title>
+<meta name="description" content="What render-mcp records and what it does not. URLs and page content are never stored or logged.">
+<link rel="canonical" href="${origin}/privacy">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root{color-scheme:light;--paper:#F2F4F1;--panel:#FBFCFA;--line:#D3DAD2;
+    --ink:#14201C;--ink-2:#46564F;--ink-3:#5A6A62;--mat:#16715B}
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+    color-scheme:dark;--paper:#101614;--panel:#171F1C;--line:#2C3A35;
+    --ink:#E6EDE9;--ink-2:#A7B5AE;--ink-3:#8F9F98;--mat:#4FBF9E}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:16px/1.6 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{max-width:680px;margin:0 auto;padding:56px 24px 72px}
+  h1{font-size:32px;line-height:1.2;margin:0 0 8px}
+  .dek{color:var(--ink-2);margin:0 0 32px}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-3);
+     margin:36px 0 12px;font-weight:600}
+  p{margin:0 0 14px;max-width:66ch}
+  table{border-collapse:collapse;width:100%;margin:0 0 14px}
+  th,td{text-align:left;padding:9px 12px;border:1px solid var(--line);font-size:14.5px}
+  th{background:var(--panel);font-weight:600}
+  code{font-family:ui-monospace,monospace;font-size:13.5px}
+  a{color:var(--mat)}
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);
+    color:var(--ink-3);font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Privacy</h1>
+  <p class="dek">What this server records, and what it does not.</p>
+
+  <main>
+    <h2>URLs and page content are never stored or logged</h2>
+    <p>Each call launches a browser, does the work, hands back the result, and closes it.
+    Nothing about <em>what</em> you asked for is retained &mdash; not the URL, not the HTML,
+    not the screenshot or PDF.</p>
+
+    <h2>One thing is counted</h2>
+    <p>Stated precisely rather than hidden behind the word &ldquo;anonymised&rdquo;:</p>
+    <table>
+      <tr><th>Recorded</th><th>Not recorded</th></tr>
+      <tr><td>Which tool ran</td><td>The URL, or any part of it</td></tr>
+      <tr><td>How it ended (<code>ok</code>, <code>timeout</code>, &hellip;)</td><td>Your IP address</td></tr>
+      <tr><td>Roughly how long it took</td><td>Any header, cookie or credential</td></tr>
+      <tr><td></td><td>Any page content, image or PDF</td></tr>
+    </table>
+    <p>Three fields, with no way to tie them to a request, a person or a site. The function that
+    writes them is never handed the URL, so it cannot record one by accident. The counts are
+    public at <a href="${origin}/stats">${origin}/stats</a>.</p>
+
+    <h2>No accounts, no credentials</h2>
+    <p>There is no signup, no API key and no session. The server holds no logins, so it never
+    sees a password or a token, and anything behind authentication renders as its login page.</p>
+
+    <h2>Content fetched on your behalf</h2>
+    <p>Pages are fetched from the public web and returned to you marked as untrusted data. Private
+    and loopback addresses are refused.</p>
+
+    <h2>Why counting happens at all</h2>
+    <p>This server is free. The only way to decide whether it is worth keeping alive is knowing
+    whether anything calls it.</p>
+  </main>
+
+  <footer>
+    <a href="${origin}/">render-mcp</a> &middot;
+    <a href="https://github.com/RodRomer/render-mcp">Source</a> &middot; MIT
+  </footer>
+</div>
 </body>
 </html>
 `;
