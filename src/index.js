@@ -12,6 +12,9 @@ import { handleRpc, clampNumber, SERVER_INFO, TOOLS } from "./protocol.js";
 const NAV_TIMEOUT_MS = 20000;
 const SELECTOR_TIMEOUT_MS = 8000;
 
+// Pinned so an upstream change can never alter audit results silently.
+const AXE_CDN = "https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js";
+
 function json(body, status = 200, extra = {}) {
   return new Response(JSON.stringify(body), {
     status,
@@ -164,6 +167,79 @@ async function runTool(name, args, env) {
       if (includeWarnings && warnings.length) {
         lines.push(`Console warnings (${warnings.length}):`);
         warnings.slice(0, 25).forEach((w) => lines.push(`  - ${w.text}`));
+      }
+
+      return toolText(lines.join("\n").trim());
+    } finally {
+      await browser.close();
+    }
+  }
+
+  if (name === "accessibility_audit") {
+    const standard = ["wcag2a", "wcag2aa", "wcag21aa", "all"].includes(args.standard)
+      ? args.standard
+      : "wcag2aa";
+    const maxViolations = clampNumber(args.max_violations, 1, 50, 20);
+
+    const browser = await puppeteer.launch(env.BROWSER);
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width: 1280, height: 800 });
+      // Some sites' CSP would block an injected script; we are auditing, not modifying.
+      await page.setBypassCSP(true);
+      await page.goto(url, { waitUntil: "networkidle0", timeout: NAV_TIMEOUT_MS });
+
+      // Loaded from CDN rather than bundled — keeps the Worker small.
+      await page.addScriptTag({ url: AXE_CDN });
+      await page.waitForFunction("typeof window.axe !== 'undefined'", { timeout: 10000 });
+
+      const tags = standard === "all" ? null : [standard];
+      const results = await page.evaluate(async (t) => {
+        const opts = t ? { runOnly: { type: "tag", values: t } } : {};
+        const r = await window.axe.run(document, opts);
+        return {
+          violations: r.violations.map((v) => ({
+            id: v.id,
+            impact: v.impact,
+            help: v.help,
+            helpUrl: v.helpUrl,
+            count: v.nodes.length,
+            samples: v.nodes.slice(0, 3).map((n) => String(n.html).slice(0, 200))
+          })),
+          passCount: r.passes.length,
+          incompleteCount: r.incomplete.length
+        };
+      }, tags);
+
+      const order = { critical: 0, serious: 1, moderate: 2, minor: 3 };
+      results.violations.sort((a, b) => (order[a.impact] ?? 9) - (order[b.impact] ?? 9));
+
+      const total = results.violations.reduce((s, v) => s + v.count, 0);
+      const lines = [];
+      lines.push(`Accessibility audit of ${url}`);
+      lines.push(`Ruleset: ${standard}`);
+      lines.push(
+        `${results.violations.length} violation type${results.violations.length === 1 ? "" : "s"} ` +
+        `across ${total} element${total === 1 ? "" : "s"}. ` +
+        `${results.passCount} checks passed, ${results.incompleteCount} need manual review.`
+      );
+      lines.push("");
+
+      if (results.violations.length === 0) {
+        lines.push("No automated violations found. Automated testing catches roughly a third of");
+        lines.push("accessibility problems — keyboard navigation and screen-reader behaviour still");
+        lines.push("need a human.");
+      } else {
+        results.violations.slice(0, maxViolations).forEach((v) => {
+          lines.push(`[${(v.impact || "unknown").toUpperCase()}] ${v.help}`);
+          lines.push(`  Rule: ${v.id} · ${v.count} element${v.count === 1 ? "" : "s"}`);
+          v.samples.forEach((s) => lines.push(`    ${s}`));
+          lines.push(`  How to fix: ${v.helpUrl}`);
+          lines.push("");
+        });
+        if (results.violations.length > maxViolations) {
+          lines.push(`...and ${results.violations.length - maxViolations} more violation types.`);
+        }
       }
 
       return toolText(lines.join("\n").trim());
