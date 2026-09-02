@@ -10,7 +10,7 @@ import { handleRpc, clampNumber, classifyFailure, wrapUntrusted, SERVER_INFO, TO
 import { inspectInPage, verdictFor } from "./inspect-page.js";
 import { usageKey, summarise, formatSummary } from "./usage.js";
 import { landingPage } from "./landing.js";
-import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, INDEXNOW_KEY } from "./routes.js";
+import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, INDEXNOW_KEY, FAVICON_SVG } from "./routes.js";
 
 /** Browser work costs money and time, so cap it hard. */
 const NAV_TIMEOUT_MS = 20000;
@@ -456,6 +456,9 @@ export default {
       case "sitemap":
         return text(sitemapXml(url.origin), "application/xml; charset=utf-8", 200,
           { "cache-control": "public, max-age=3600" });
+
+      case "favicon":
+        return text(FAVICON_SVG, "image/svg+xml", 200, { "cache-control": "public, max-age=86400" });
 
       case "indexnow-key":
         // The key file's whole job is to be fetchable and contain the key.
