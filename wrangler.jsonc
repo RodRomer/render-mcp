@@ -15,6 +15,18 @@
       "custom_domain": true
     }
   ],
+  // Counts tool calls only — which tool, how it ended, how long it took.
+  // No URLs, no addresses, no content: see `count()` in src/index.js.
+  //
+  // KV rather than Analytics Engine, which needs a one-time dashboard opt-in this
+  // account hasn't done. KV also lets the Worker serve its own /stats without an
+  // API token, so reading the numbers is opening a URL rather than running a script.
+  "kv_namespaces": [
+    {
+      "binding": "USAGE",
+      "id": "3dac191cf16040f7a41a28bb840bb0da"
+    }
+  ],
   "observability": {
     "enabled": true
   }
