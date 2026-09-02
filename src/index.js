@@ -10,7 +10,7 @@ import { handleRpc, clampNumber, classifyFailure, wrapUntrusted, SERVER_INFO, TO
 import { inspectInPage, verdictFor } from "./inspect-page.js";
 import { usageKey, summarise, formatSummary } from "./usage.js";
 import { landingPage } from "./landing.js";
-import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, INDEXNOW_KEY, FAVICON_SVG } from "./routes.js";
+import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, privacyHtml, INDEXNOW_KEY, FAVICON_SVG } from "./routes.js";
 
 /** Browser work costs money and time, so cap it hard. */
 const NAV_TIMEOUT_MS = 20000;
@@ -448,6 +448,10 @@ export default {
         const { names, truncated } = await readUsage(env);
         return text(formatSummary(summarise(names), { truncated }), "text/plain; charset=utf-8");
       }
+
+      case "privacy":
+        return text(privacyHtml(url.origin), "text/html; charset=utf-8", 200,
+          { "cache-control": "public, max-age=3600" });
 
       case "robots":
         return text(robotsTxt(url.origin), "text/plain; charset=utf-8", 200,
