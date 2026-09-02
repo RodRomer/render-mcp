@@ -1,8 +1,13 @@
 {
-    "homepage":  "https://github.com/RodRomer/render-mcp",
-    "description":  "Gives an AI agent a real browser: screenshots, PDFs, and post-JavaScript HTML. No API key or signup.",
-    "name":  "io.github.rodromer/render-mcp",
+    "$schema":  "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+    "name":  "io.github.RodRomer/render-mcp",
+    "description":  "A real browser for AI agents: screenshots, PDFs, post-JS HTML. No API key.",
     "version":  "0.1.0",
+    "websiteUrl":  "https://github.com/RodRomer/render-mcp",
+    "repository":  {
+                       "url":  "https://github.com/RodRomer/render-mcp",
+                       "source":  "github"
+                   },
     "remotes":  [
                     {
                         "type":  "streamable-http",
