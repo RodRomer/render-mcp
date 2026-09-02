@@ -196,7 +196,7 @@ https://render.makermargins.com/stats
 
 ```bash
 npm install
-npm test          # 151 tests (protocol + usage), no network or browser needed
+npm test          # 279 tests, no network or browser needed
 npm run test:dom  # 39 DOM tests, headless Edge/Chrome, no network
 npm run dev       # local worker
 npm run deploy    # to Cloudflare
