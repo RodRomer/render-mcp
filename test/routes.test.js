@@ -12,7 +12,7 @@
  * the whole table rather than a check of one path.
  */
 
-import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, INDEXNOW_KEY } from "../src/routes.js";
+import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, INDEXNOW_KEY, FAVICON_SVG } from "../src/routes.js";
 
 let pass = 0;
 let fail = 0;
@@ -28,7 +28,7 @@ function section(t) { console.log(`\n=== ${t} ===`); }
 const HTML = "text/html,application/xhtml+xml";
 
 section("1. The bug: unknown paths must not be 200");
-for (const p of ["/favicon.ico", "/wp-admin", "/.env", "/typo", "/a/b/c", "/index.php"]) {
+for (const p of ["/wp-admin", "/.env", "/typo", "/a/b/c", "/index.php", "/robots.txt.bak"]) {
   check(`${p} is not found`, resolveRoute("GET", p, "").kind, "not-found");
 }
 check("a 404 to a browser is marked for html", resolveRoute("GET", "/typo", HTML).html, true);
@@ -48,6 +48,14 @@ check("sitemap.xml routes to sitemap", resolveRoute("GET", "/sitemap.xml", "").k
 check("robots is unaffected by an html Accept", resolveRoute("GET", "/robots.txt", HTML).kind, "robots");
 check("the IndexNow key file is served", resolveRoute("GET", `/${INDEXNOW_KEY}.txt`, "").kind, "indexnow-key");
 check("a wrong key is not served", resolveRoute("GET", "/deadbeef.txt", "").kind, "not-found");
+
+section("3b. Favicon");
+// Browsers request /favicon.ico whatever the page declares, so a 404 there is a
+// wasted round trip on every single visit.
+check("favicon.svg is served", resolveRoute("GET", "/favicon.svg", "").kind, "favicon");
+check("the legacy .ico path is served the same svg", resolveRoute("GET", "/favicon.ico", "").kind, "favicon");
+check("the svg is well-formed enough to have a viewBox", FAVICON_SVG.includes("viewBox"), true);
+check("it closes its root element", FAVICON_SVG.trim().endsWith("</svg>"), true);
 
 section("4. The MCP endpoint and methods");
 check("POST is JSON-RPC", resolveRoute("POST", "/mcp", "").kind, "mcp");
