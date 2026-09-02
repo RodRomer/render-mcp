@@ -6,7 +6,7 @@
  */
 
 import puppeteer from "@cloudflare/puppeteer";
-import { handleRpc, clampNumber, classifyFailure, SERVER_INFO, TOOLS } from "./protocol.js";
+import { handleRpc, clampNumber, classifyFailure, wrapUntrusted, SERVER_INFO, TOOLS } from "./protocol.js";
 import { inspectInPage, verdictFor } from "./inspect-page.js";
 import { usageKey, summarise, formatSummary } from "./usage.js";
 
@@ -93,7 +93,7 @@ async function runTool(name, args, env) {
       const note = truncated
         ? `\n\n[Truncated at ${maxChars} characters of ${html.length}. Raise max_chars for more.]`
         : "";
-      return toolText(body + note);
+      return toolText(wrapUntrusted(body + note, url, "page html"));
     } finally {
       await browser.close();
     }
@@ -175,7 +175,9 @@ async function runTool(name, args, env) {
         warnings.slice(0, 25).forEach((w) => lines.push(`  - ${w.text}`));
       }
 
-      return toolText(lines.join("\n").trim());
+      // Console text and error messages are written by the page, so this report
+      // carries attacker-controllable strings even though its structure is ours.
+      return toolText(wrapUntrusted(lines.join("\n").trim(), url, "page diagnostics"));
     } finally {
       await browser.close();
     }
