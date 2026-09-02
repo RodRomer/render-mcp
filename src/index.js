@@ -9,6 +9,7 @@ import puppeteer from "@cloudflare/puppeteer";
 import { handleRpc, clampNumber, classifyFailure, wrapUntrusted, SERVER_INFO, TOOLS } from "./protocol.js";
 import { inspectInPage, verdictFor } from "./inspect-page.js";
 import { usageKey, summarise, formatSummary } from "./usage.js";
+import { landingPage } from "./landing.js";
 
 /** Browser work costs money and time, so cap it hard. */
 const NAV_TIMEOUT_MS = 20000;
@@ -439,6 +440,23 @@ export default {
         headers: { "content-type": "text/plain; charset=utf-8", "access-control-allow-origin": "*" }
       });
     }
+    // A person following this URL from a registry used to get raw JSON, and a
+    // crawler got nothing indexable at all. Negotiate instead: browsers ask for
+    // text/html and get the page, everything else keeps the existing JSON
+    // contract byte for byte, so nothing that already parses this breaks.
+    if (request.method === "GET" && url.pathname !== "/mcp" && url.pathname !== "/stats") {
+      const accept = request.headers.get("accept") || "";
+      if (accept.includes("text/html")) {
+        return new Response(landingPage(TOOLS), {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+            "cache-control": "public, max-age=300",
+            "access-control-allow-origin": "*"
+          }
+        });
+      }
+    }
+
     // A human landing on the URL should learn what this is.
     if (request.method === "GET" && url.pathname !== "/mcp") {
       return json({
