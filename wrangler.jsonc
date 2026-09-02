@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "render-mcp",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "browser": {
+    "binding": "BROWSER"
+  },
+  // The account's workers.dev subdomain isn't provisioned, so serve from a zone
+  // that already exists. Easy to move to its own domain later.
+  "routes": [
+    {
+      "pattern": "render.makermargins.com",
+      "custom_domain": true
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}
