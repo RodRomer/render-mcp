@@ -7,6 +7,7 @@
 
 import puppeteer from "@cloudflare/puppeteer";
 import { handleRpc, clampNumber, SERVER_INFO, TOOLS } from "./protocol.js";
+import { inspectInPage, verdictFor } from "./inspect-page.js";
 
 /** Browser work costs money and time, so cap it hard. */
 const NAV_TIMEOUT_MS = 20000;
@@ -252,6 +253,68 @@ async function runTool(name, args, env) {
           lines.push(`...and ${results.violations.length - maxViolations} more violation types.`);
         }
       }
+
+      return toolText(lines.join("\n").trim());
+    } finally {
+      await browser.close();
+    }
+  }
+
+  if (name === "inspect_element") {
+    const width = clampNumber(args.width, 320, 2560, 1280);
+    const height = clampNumber(args.height, 240, 2000, 800);
+    const maxMatches = clampNumber(args.max_matches, 1, 10, 3);
+    const selector = args.selector;
+
+    const { browser, page } = await openPage(env, url, width, height);
+    try {
+      const data = await page.evaluate(inspectInPage, selector, maxMatches);
+
+      if (data.badSelector) {
+        return toolText(
+          `"${selector}" is not a valid CSS selector, so the browser could not run it. ` +
+          `Note this takes a CSS selector, not XPath.`,
+          true
+        );
+      }
+
+      const lines = [];
+      lines.push(`Inspecting "${selector}" on ${url}`);
+      lines.push(`Viewport: ${data.viewport.w}x${data.viewport.h}`);
+
+      if (data.total === 0) {
+        lines.push("");
+        lines.push(
+          "No elements matched. The selector may be wrong, or the content may be rendered later than " +
+          "this snapshot — check with rendered_html to see the DOM this page actually produced."
+        );
+        return toolText(lines.join("\n"));
+      }
+
+      lines.push(`${data.total} element${data.total === 1 ? "" : "s"} matched, showing ${data.report.length}.`);
+      lines.push("");
+
+      data.report.forEach((e, i) => {
+        lines.push(`--- match ${i + 1}: ${e.tag}`);
+
+        // Lead with the diagnosis, since that is the question being asked.
+        lines.push(`  ${verdictFor(e)}`);
+
+        lines.push(`  Box: ${e.box.w}x${e.box.h} at (${e.box.x}, ${e.box.y})`);
+        lines.push(`  display:${e.display}  visibility:${e.visibility}  opacity:${e.opacity}`);
+        lines.push(`  position:${e.position}  z-index:${e.zIndex}  overflow:${e.overflow}`);
+        lines.push(`  colour:${e.color} on ${e.background}`);
+        lines.push(`  font: ${e.font}`);
+        lines.push(`  margin:${e.margin}  padding:${e.padding}`);
+        lines.push(`  border:${e.border}`);
+        if (e.transform) { lines.push(`  transform:${e.transform}`); }
+        lines.push("");
+      });
+
+      lines.push(
+        "These are post-cascade, post-layout values from a real browser — the same numbers DevTools " +
+        "shows. They cannot be derived by reading the HTML and CSS."
+      );
 
       return toolText(lines.join("\n").trim());
     } finally {
