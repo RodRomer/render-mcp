@@ -1,0 +1,132 @@
+/**
+ * Tests for the protocol layer. Runs under plain node — no Worker, no browser,
+ * no network. Same discipline as the calculators: the logic is a pure function,
+ * so it can be proven correct before anything is deployed.
+ */
+
+import {
+  handleRpc,
+  validateUrl,
+  clampNumber,
+  TOOLS,
+  PROTOCOL_VERSION,
+  SERVER_INFO
+} from "../src/protocol.js";
+
+let pass = 0;
+let fail = 0;
+
+function check(label, got, want) {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  if (ok) {
+    pass++;
+    console.log(`  PASS  ${label}`);
+  } else {
+    fail++;
+    console.log(`  FAIL  ${label}\n        got  ${JSON.stringify(got)}\n        want ${JSON.stringify(want)}`);
+  }
+}
+
+function section(t) {
+  console.log(`\n=== ${t} ===`);
+}
+
+section("1. Handshake");
+const init = handleRpc({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
+check("returns the protocol version", init.result.protocolVersion, PROTOCOL_VERSION);
+check("advertises the tools capability", typeof init.result.capabilities.tools, "object");
+check("identifies the server", init.result.serverInfo.name, SERVER_INFO.name);
+check("echoes the request id", init.id, 1);
+
+section("2. Notifications get no reply");
+check("initialized notification is silent", handleRpc({ jsonrpc: "2.0", method: "notifications/initialized" }), null);
+check("cancelled notification is silent", handleRpc({ jsonrpc: "2.0", method: "notifications/cancelled" }), null);
+check("ping does reply", handleRpc({ jsonrpc: "2.0", id: 2, method: "ping" }).result, {});
+
+section("3. Tool listing");
+const list = handleRpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
+check("lists three tools", list.result.tools.length, 3);
+check("names are stable", list.result.tools.map((t) => t.name), ["screenshot_url", "rendered_html", "url_to_pdf"]);
+for (const t of TOOLS) {
+  check(`${t.name} requires a url`, t.inputSchema.required, ["url"]);
+  check(`${t.name} has a description an agent can act on`, t.description.length > 80, true);
+}
+
+section("4. URL validation — the security boundary");
+check("plain https is fine", validateUrl("https://example.com").ok, true);
+check("http is fine", validateUrl("http://example.com").ok, true);
+check("normalises the url", validateUrl(" https://example.com/a?b=1 ").url, "https://example.com/a?b=1");
+check("rejects file scheme", validateUrl("file:///etc/passwd").ok, false);
+check("rejects javascript scheme", validateUrl("javascript:alert(1)").ok, false);
+check("rejects data scheme", validateUrl("data:text/html,<h1>x</h1>").ok, false);
+check("rejects nonsense", validateUrl("not a url").ok, false);
+check("rejects empty", validateUrl("").ok, false);
+check("rejects undefined", validateUrl(undefined).ok, false);
+
+section("5. SSRF — a Worker sits inside Cloudflare's network");
+for (const bad of [
+  "http://localhost/admin",
+  "http://127.0.0.1:8080",
+  "http://0.0.0.0",
+  "http://10.0.0.5",
+  "http://172.16.0.1",
+  "http://172.31.255.255",
+  "http://192.168.1.1",
+  "http://169.254.169.254/latest/meta-data/",
+  "http://metadata.google.internal/",
+  "https://foo.internal/",
+  "https://printer.local/"
+]) {
+  check(`blocks ${bad}`, validateUrl(bad).ok, false);
+}
+check("allows a public 172.x that is NOT private", validateUrl("http://172.32.0.1").ok, true);
+check("allows a public 192.x that is NOT private", validateUrl("http://192.169.0.1").ok, true);
+
+section("6. tools/call defers real work, with a validated url");
+const call = handleRpc({
+  jsonrpc: "2.0",
+  id: 9,
+  method: "tools/call",
+  params: { name: "screenshot_url", arguments: { url: "https://example.com", full_page: true } }
+});
+check("defers to the named tool", call.defer, "screenshot_url");
+check("passes the validated url through", call.args.url, "https://example.com/");
+check("preserves other arguments", call.args.full_page, true);
+check("carries the request id", call.id, 9);
+
+section("7. Failures are results, not protocol errors");
+const badUrl = handleRpc({
+  jsonrpc: "2.0",
+  id: 10,
+  method: "tools/call",
+  params: { name: "screenshot_url", arguments: { url: "http://127.0.0.1" } }
+});
+check("bad url returns isError, not a JSON-RPC error", badUrl.result.isError, true);
+check("  and explains why in text the agent can read", badUrl.result.content[0].type, "text");
+check("  and is not a protocol-level error", badUrl.error, undefined);
+
+const unknown = handleRpc({
+  jsonrpc: "2.0",
+  id: 11,
+  method: "tools/call",
+  params: { name: "no_such_tool", arguments: { url: "https://example.com" } }
+});
+check("unknown tool is a protocol error", unknown.error.code, -32602);
+check("  and lists what is available", unknown.error.message.includes("screenshot_url"), true);
+
+check("unknown method is -32601", handleRpc({ jsonrpc: "2.0", id: 12, method: "nope" }).error.code, -32601);
+check("malformed request is -32600", handleRpc({ foo: "bar" }).error.code, -32600);
+check("wrong jsonrpc version is rejected", handleRpc({ jsonrpc: "1.0", id: 1, method: "ping" }).error.code, -32600);
+
+section("8. Numeric clamping");
+check("in range passes through", clampNumber(800, 320, 2560, 1280), 800);
+check("below min clamps up", clampNumber(10, 320, 2560, 1280), 320);
+check("above max clamps down", clampNumber(99999, 320, 2560, 1280), 2560);
+check("non-numeric falls back", clampNumber("wide", 320, 2560, 1280), 1280);
+check("undefined falls back", clampNumber(undefined, 320, 2560, 1280), 1280);
+check("rounds fractions", clampNumber(800.7, 320, 2560, 1280), 801);
+
+console.log(`\n========================================`);
+console.log(`  PASSED: ${pass}    FAILED: ${fail}`);
+console.log(`========================================`);
+process.exit(fail === 0 ? 0 : 1);
