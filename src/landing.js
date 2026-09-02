@@ -58,7 +58,12 @@ export function landingPage(tools) {
 <meta property="og:title" content="render-mcp — a real browser for AI agents">
 <meta property="og:description" content="A hosted MCP server that gives an AI agent a real browser. No API key, no signup, nothing to install.">
 <meta property="og:url" content="https://render.makermargins.com/">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://makermargins.com/render-og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://makermargins.com/render-og.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"render-mcp",
 "applicationCategory":"DeveloperApplication","operatingSystem":"Any",
