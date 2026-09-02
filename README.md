@@ -211,6 +211,17 @@ Two layers, both tested outside their host:
 If Node isn't installed, `npm run test:nonode` runs the protocol suite in headless Edge instead.
 It strips only the `export`/`import` keywords and executes the same source.
 
+### When testing against a live page, use a neutral URL
+
+Use `https://example.com` — it is reserved by IANA for exactly this — or `httpstat.us` for error
+paths. **Do not point live tests at `makermargins.com`.**
+
+The reason is not politeness. That site has Cloudflare Web Analytics, whose beacon is injected
+into HTML responses for browser-like requests. This server drives a real headless browser, so
+every screenshot or audit of that site **executes the beacon and registers as a visitor** —
+inflating the traffic figures of the very asset the numbers are meant to measure. An instrument
+that counts its own operator measures nothing.
+
 ## Status
 
 Early and free. Built to find out whether MCP registry discovery actually works. If it gets
