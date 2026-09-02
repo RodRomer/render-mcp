@@ -83,6 +83,34 @@ export const TOOLS = [
     }
   },
   {
+    name: "accessibility_audit",
+    description:
+      "Run a WCAG accessibility audit on a page using axe-core in a real browser, and report the violations " +
+      "with the elements responsible. Because it runs against a genuinely rendered page, colour-contrast and " +
+      "other rules that depend on layout and computed colour actually fire — these are silently skipped by " +
+      "audits that parse HTML without a layout engine. Use this to check a page meets WCAG before shipping.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The absolute URL to audit, including https://" },
+        standard: {
+          type: "string",
+          description:
+            "Which ruleset to run: 'wcag2a', 'wcag2aa' (the usual legal benchmark), 'wcag21aa', or 'all'. " +
+            "Defaults to wcag2aa.",
+          enum: ["wcag2a", "wcag2aa", "wcag21aa", "all"],
+          default: "wcag2aa"
+        },
+        max_violations: {
+          type: "number",
+          description: "Maximum violation types to report in detail. 1-50. Defaults to 20.",
+          default: 20
+        }
+      },
+      required: ["url"]
+    }
+  },
+  {
     name: "url_to_pdf",
     description:
       "Render a web page to PDF exactly as a browser would print it. Use this to archive a page, produce a " +
