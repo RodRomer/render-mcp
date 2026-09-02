@@ -10,6 +10,7 @@ import { handleRpc, clampNumber, classifyFailure, wrapUntrusted, SERVER_INFO, TO
 import { inspectInPage, verdictFor } from "./inspect-page.js";
 import { usageKey, summarise, formatSummary } from "./usage.js";
 import { landingPage } from "./landing.js";
+import { resolveRoute, robotsTxt, sitemapXml, notFoundHtml, INDEXNOW_KEY } from "./routes.js";
 
 /** Browser work costs money and time, so cap it hard. */
 const NAV_TIMEOUT_MS = 20000;
@@ -420,62 +421,73 @@ function bytesToBase64(buf) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const route = resolveRoute(request.method, url.pathname, request.headers.get("accept") || "");
 
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        status: 204,
-        headers: {
-          "access-control-allow-origin": "*",
-          "access-control-allow-methods": "GET, POST, OPTIONS",
-          "access-control-allow-headers": "content-type, mcp-protocol-version, mcp-session-id"
-        }
-      });
-    }
+    const CORS = { "access-control-allow-origin": "*" };
+    const text = (body, type, status = 200, extra = {}) =>
+      new Response(body, { status, headers: { "content-type": type, ...CORS, ...extra } });
 
-    // Readable without an API token or a script: open it in a browser.
-    if (request.method === "GET" && url.pathname === "/stats") {
-      if (!env.USAGE) { return new Response("Usage counting is not configured.", { status: 503 }); }
-      const { names, truncated } = await readUsage(env);
-      return new Response(formatSummary(summarise(names), { truncated }), {
-        headers: { "content-type": "text/plain; charset=utf-8", "access-control-allow-origin": "*" }
-      });
-    }
-    // A person following this URL from a registry used to get raw JSON, and a
-    // crawler got nothing indexable at all. Negotiate instead: browsers ask for
-    // text/html and get the page, everything else keeps the existing JSON
-    // contract byte for byte, so nothing that already parses this breaks.
-    if (request.method === "GET" && url.pathname !== "/mcp" && url.pathname !== "/stats") {
-      const accept = request.headers.get("accept") || "";
-      if (accept.includes("text/html")) {
-        return new Response(landingPage(TOOLS), {
+    switch (route.kind) {
+      case "cors":
+        return new Response(null, {
+          status: 204,
           headers: {
-            "content-type": "text/html; charset=utf-8",
-            "cache-control": "public, max-age=300",
-            "access-control-allow-origin": "*"
+            ...CORS,
+            "access-control-allow-methods": "GET, POST, OPTIONS",
+            "access-control-allow-headers": "content-type, mcp-protocol-version, mcp-session-id"
           }
         });
+
+      case "landing":
+        return text(landingPage(TOOLS), "text/html; charset=utf-8", 200,
+          { "cache-control": "public, max-age=300" });
+
+      case "stats": {
+        // Readable without an API token or a script: open it in a browser.
+        if (!env.USAGE) return text("Usage counting is not configured.", "text/plain; charset=utf-8", 503);
+        const { names, truncated } = await readUsage(env);
+        return text(formatSummary(summarise(names), { truncated }), "text/plain; charset=utf-8");
       }
-    }
 
-    // A human landing on the URL should learn what this is.
-    if (request.method === "GET" && url.pathname !== "/mcp") {
-      return json({
-        name: SERVER_INFO.name,
-        title: SERVER_INFO.title,
-        version: SERVER_INFO.version,
-        description:
-          "An MCP server that gives AI agents a real browser. Screenshots, PDFs, and post-JavaScript HTML. " +
-          "No API key, no signup.",
-        endpoint: new URL("/mcp", url.origin).toString(),
-        transport: "streamable-http",
-        tools: TOOLS.map((t) => ({ name: t.name, description: t.description }))
-      });
-    }
+      case "robots":
+        return text(robotsTxt(url.origin), "text/plain; charset=utf-8", 200,
+          { "cache-control": "public, max-age=3600" });
 
-    if (request.method !== "POST") {
-      return json({ error: "POST JSON-RPC to /mcp" }, 405);
-    }
+      case "sitemap":
+        return text(sitemapXml(url.origin), "application/xml; charset=utf-8", 200,
+          { "cache-control": "public, max-age=3600" });
 
+      case "indexnow-key":
+        // The key file's whole job is to be fetchable and contain the key.
+        return text(INDEXNOW_KEY, "text/plain; charset=utf-8");
+
+      case "json":
+        return json({
+          name: SERVER_INFO.name,
+          title: SERVER_INFO.title,
+          version: SERVER_INFO.version,
+          description:
+            "An MCP server that gives AI agents a real browser. Screenshots, PDFs, and post-JavaScript HTML. " +
+            "No API key, no signup.",
+          endpoint: new URL("/mcp", url.origin).toString(),
+          transport: "streamable-http",
+          tools: TOOLS.map((t) => ({ name: t.name, description: t.description }))
+        });
+
+      case "method-not-allowed":
+        return json({ error: "POST JSON-RPC to /mcp" }, 405);
+
+      case "not-found":
+        // Previously this returned 200 with the server's JSON for any path at
+        // all, so nothing on this host ever 404'd.
+        return route.html
+          ? text(notFoundHtml(url.origin), "text/html; charset=utf-8", 404)
+          : json({ error: "Not found. This host serves /, /stats and /mcp." }, 404);
+
+      case "mcp":
+      default:
+        break;
+    }
     let body;
     try {
       body = await request.json();
