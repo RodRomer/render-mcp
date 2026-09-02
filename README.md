@@ -95,6 +95,44 @@ Playwright MCP can do this too — but it must be installed locally, with Node a
 binaries present, and its HTTP mode has known session bugs. This runs hosted, stateless, with
 nothing to install.
 
+### `inspect_element`
+
+Answers *"why isn't this element showing where I expect?"* for a CSS selector.
+
+| Argument | Type | Notes |
+|---|---|---|
+| `url` | string | **Required.** Absolute, including `https://` |
+| `selector` | string | **Required.** CSS selector, e.g. `.buy-button` |
+| `max_matches` | number | How many matches to report, 1–10. Default `3` |
+| `width` | number | Viewport width, 320–2560. Default `1280` |
+| `height` | number | Viewport height, 240–2000. Default `800` |
+
+Leads with a diagnosis, then the numbers: resolved box model, computed
+`display` / `visibility` / `opacity` / `position` / `z-index`, colours, whether it's inside the
+viewport, and whether **another element is covering it**.
+
+The useful part is that it walks *up* the tree. The usual reason an element is missing is not the
+element — it's an ancestor, and the answer you want is *which* one:
+
+```
+--- match 1: button#buy
+  HIDDEN BY AN ANCESTOR — div.modal.panel has display:none. The element itself is fine.
+```
+
+It also catches the case no single property reveals. Content inside a closed `<details>` keeps a
+normal box and reports `display:block`, `visibility:visible`, `opacity:1` — everything looks fine,
+and it still doesn't paint:
+
+```
+  NOT RENDERED — it sits inside details.fees, which is not displaying its
+  contents because of a closed <details>.
+  Box: 70x27 ...  display:block  visibility:visible  opacity:1
+```
+
+Good for: an element that "should be there", a click landing on the wrong thing, verifying a CSS
+change actually applied. **Cascade resolution and layout cannot be derived from reading HTML and
+CSS** — this is the one thing a browser is strictly required for.
+
 ### `url_to_pdf`
 
 Render a page to PDF as a browser would print it.
@@ -129,15 +167,27 @@ launches a browser, does the work, and closes it.
 
 ```bash
 npm install
-npm test        # 64 tests, no network or browser needed
-npm run dev     # local worker
-npm run deploy  # to Cloudflare
+npm test          # 97 protocol tests, no network or browser needed
+npm run test:dom  # 39 DOM tests, headless Edge/Chrome, no network
+npm run dev       # local worker
+npm run deploy    # to Cloudflare
 ```
 
-The MCP protocol layer in `src/protocol.js` is pure functions with no Cloudflare or browser
-dependencies, so the whole request/response surface — including every URL validation rule — is
-tested under plain Node before anything is deployed. `src/index.js` is a thin shell that does
-the browser work.
+Two layers, both tested outside their host:
+
+- **`src/protocol.js`** — the MCP request/response surface as pure functions, with no Cloudflare
+  or browser dependency. Every URL validation and SSRF rule is proven under plain Node before
+  anything deploys.
+- **`src/inspect-page.js`** — the half of `inspect_element` that runs *inside* the page. It closes
+  over nothing, so any real DOM can execute it. Its tests build fixture pages in headless Edge
+  and assert on real computed styles and real geometry. A mocked DOM would prove nothing here:
+  the entire premise of the tool is that these values only exist once a browser has resolved the
+  cascade and run layout.
+
+`src/index.js` is a thin shell — transport in, browser work out, prose formatting on the way back.
+
+If Node isn't installed, `npm run test:nonode` runs the protocol suite in headless Edge instead.
+It strips only the `export`/`import` keywords and executes the same source.
 
 ## Status
 
