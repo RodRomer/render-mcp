@@ -1,0 +1,12 @@
+{
+    "homepage":  "https://github.com/RodRomer/render-mcp",
+    "description":  "Gives an AI agent a real browser: screenshots, PDFs, and post-JavaScript HTML. No API key or signup.",
+    "name":  "io.github.rodromer/render-mcp",
+    "version":  "0.1.0",
+    "remotes":  [
+                    {
+                        "type":  "streamable-http",
+                        "url":  "https://render.makermargins.com/mcp"
+                    }
+                ]
+}
