@@ -236,6 +236,18 @@ used, it'll be maintained; if it doesn't, that's a useful answer too.
 
 Issues and pull requests welcome.
 
+## How this was built
+
+Written by Claude, directed by a human, and stated here rather than left to be inferred.
+
+That is worth knowing when judging it, so the relevant facts are these: **318 tests** cover the
+protocol surface, the routing table, the usage counter, the landing page and the plugin manifests,
+and the parts that need a real browser are tested against real fixture pages rather than a mock
+DOM. Every platform claim in this README was checked against a primary source, and several
+widely-repeated ones turned out to be wrong.
+
+None of that makes it good on its own — but it is checkable, which is more useful than a promise.
+
 ## Licence
 
 MIT
