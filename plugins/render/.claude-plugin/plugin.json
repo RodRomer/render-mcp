@@ -1,7 +1,7 @@
 {
   "name": "render",
   "description": "A real browser for AI agents. Six tools over a hosted headless browser: screenshots, post-JavaScript HTML, console diagnostics, WCAG audits, computed styles and PDF. No API key, no signup, nothing installed locally.",
-  "version": "0.7.2",
+  "version": "0.7.3",
   "author": { "name": "RodRomer" },
   "homepage": "https://render.makermargins.com/",
   "repository": "https://github.com/RodRomer/render-mcp",
