@@ -11,7 +11,7 @@ export const PROTOCOL_VERSION = "2025-06-18";
 export const SERVER_INFO = {
   name: "render-mcp",
   title: "Render — a real browser for agents",
-  version: "0.4.0"
+  version: "0.5.0"
 };
 
 /** Tool definitions, exactly as advertised over MCP. */
@@ -223,6 +223,65 @@ export function clampNumber(value, min, max, fallback) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(max, Math.max(min, Math.round(n)));
+}
+
+/* ------------------------------------------------------------------ */
+/* Failure classification                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Work out what actually went wrong, and say it in terms the agent can act on.
+ *
+ * The distinction that matters is **our fault versus the page's fault**. Telling
+ * an agent a URL is broken when we were merely rate-limited makes it abandon a
+ * perfectly good URL. Pure, because getting this wrong is expensive and silent —
+ * a misleading message still reads like a correct one.
+ *
+ * The label is also what gets counted. Prose and telemetry come from the same
+ * decision here, so a report can never disagree with what the agent was told.
+ */
+export function classifyFailure(raw, url) {
+  const text = String(raw == null ? "" : raw);
+
+  // Capacity is checked first: a rate-limited request can still mention a
+  // timeout, and blaming the page for our own limit is the costly mistake.
+  if (/429|rate limit|too many|concurrent|unable to create new browser/i.test(text)) {
+    return {
+      label: "capacity",
+      ours: true,
+      message:
+        `This server is at its rendering capacity right now, so ${url} was not attempted. ` +
+        `Nothing is wrong with the URL — wait a few seconds and retry.`
+    };
+  }
+  if (/ERR_NAME_NOT_RESOLVED|ERR_ADDRESS_UNREACHABLE|getaddrinfo/i.test(text)) {
+    return {
+      label: "dns",
+      ours: false,
+      message: `${url} could not be resolved. Check the hostname is spelt correctly and is public.`
+    };
+  }
+  if (/ERR_CERT|SSL|certificate/i.test(text)) {
+    return {
+      label: "tls",
+      ours: false,
+      message: `${url} has a TLS certificate problem, so the browser refused to load it.`
+    };
+  }
+  if (/timeout|timed out|Navigation timeout/i.test(text)) {
+    return {
+      label: "timeout",
+      ours: false,
+      message:
+        `${url} did not finish loading within the time limit. It may be very slow, or waiting on a ` +
+        `resource that never arrives.`
+    };
+  }
+  return {
+    label: "page_error",
+    ours: false,
+    message: `Could not render ${url}. ${text}. The page may be slow, unreachable, or require a login.`
+  };
 }
 
 /* ------------------------------------------------------------------ */
