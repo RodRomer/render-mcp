@@ -73,6 +73,16 @@ check("declares a licence", plugin.license, "MIT");
 check("points at the live page", plugin.homepage, "https://render.makermargins.com/");
 check("points at the repository", plugin.repository.includes("github.com/RodRomer/render-mcp"), true);
 
+section("4b. The LobeHub marketplace manifest");
+// LobeHub auto-crawled this repo at v0.1.0 and froze there, listing no tools.
+// This manifest is how the listing gets corrected, and the version must track
+// the server or the same drift returns silently.
+const lhm = read("lhm.plugin.json");
+check("declares the identifier LobeHub already assigned", lhm.identifier, "rodromer-render-mcp");
+check("version tracks the server", lhm.version, SERVER_INFO.version);
+check("carries a substantial description", lhm.description.length > 60, true);
+check("name is set", lhm.name.length > 0, true);
+
 section("5. The MCP server declaration");
 const servers = Object.keys(mcp.mcpServers);
 check("declares exactly one server", servers.length, 1);
