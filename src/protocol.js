@@ -11,7 +11,7 @@ export const PROTOCOL_VERSION = "2025-06-18";
 export const SERVER_INFO = {
   name: "render-mcp",
   title: "Render — a real browser for agents",
-  version: "0.7.0"
+  version: "0.7.1"
 };
 
 /** Tool definitions, exactly as advertised over MCP. */
