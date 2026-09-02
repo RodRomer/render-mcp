@@ -192,15 +192,16 @@ export default {
           responses.push({ jsonrpc: "2.0", id: out.id, result });
         } catch (err) {
           // Browser failures are the agent's problem to route around, not a crash.
-          responses.push({
-            jsonrpc: "2.0",
-            id: out.id,
-            result: toolText(
-              `Could not render ${out.args.url}. ${String(err?.message || err)}. ` +
-                `The page may be slow, blocked, or require a login.`,
-              true
-            )
-          });
+          // Tell it *which* problem: our capacity or the page. Blaming the page for
+          // our rate limit makes an agent abandon a URL that was fine.
+          const raw = String(err?.message || err);
+          const isCapacity = /429|rate limit|too many|concurrent|unable to create new browser/i.test(raw);
+          const text = isCapacity
+            ? `This server is at its rendering capacity right now, so ${out.args.url} was not attempted. ` +
+              `Nothing is wrong with the URL — wait a few seconds and retry.`
+            : `Could not render ${out.args.url}. ${raw}. ` +
+              `The page may be slow, unreachable, or require a login.`;
+          responses.push({ jsonrpc: "2.0", id: out.id, result: toolText(text, true) });
         }
         continue;
       }
