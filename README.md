@@ -28,7 +28,14 @@ and hands back what the page actually looks like.
 
 ## Install
 
-**Claude Code**
+**Claude Code — as a plugin** (one command, and updates arrive automatically)
+
+```
+/plugin marketplace add RodRomer/render-mcp
+/plugin install render@render-mcp
+```
+
+**Claude Code — directly**
 
 ```bash
 claude mcp add --transport http render https://render.makermargins.com/mcp
