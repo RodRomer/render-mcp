@@ -1,0 +1,6 @@
+{
+  "identifier": "rodromer-render-mcp",
+  "name": "render-mcp",
+  "description": "A real browser for AI agents: screenshots, post-JavaScript HTML, console diagnostics, WCAG audits, computed styles and PDF. Hosted, with no API key and nothing installed locally.",
+  "version": "0.7.3"
+}
