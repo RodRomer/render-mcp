@@ -1,6 +1,7 @@
 {
   "name": "render-mcp",
   "owner": { "name": "RodRomer" },
+  "description": "A hosted headless browser for AI agents. One plugin, six tools, nothing installed locally and no API key.",
   "plugins": [
     {
       "name": "render",
