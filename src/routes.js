@@ -19,6 +19,19 @@
 /** The IndexNow key for this host. Public by design: hosting it is the proof. */
 export const INDEXNOW_KEY = "8c1f47b0e2a94d6fb35ac0d918e7f24c";
 
+
+/**
+ * A browser viewport — which is precisely what this server hands an agent.
+ * Inline rather than a file because a Worker has no asset store, and an SVG
+ * favicon covers every size a browser asks for with one response.
+ */
+export const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="7" fill="#0E1614"/>
+  <rect x="6" y="7" width="20" height="18" rx="3" fill="none" stroke="#4FBF9E" stroke-width="2.2"/>
+  <path d="M6 13h20" stroke="#4FBF9E" stroke-width="2.2"/>
+  <circle cx="9.6" cy="10" r="1.15" fill="#4FBF9E"/>
+</svg>`;
+
 export function resolveRoute(method, pathname, accept = "") {
   const wantsHtml = String(accept).includes("text/html");
 
@@ -44,6 +57,11 @@ export function resolveRoute(method, pathname, accept = "") {
       return { kind: "sitemap" };
     case `/${INDEXNOW_KEY}.txt`:
       return { kind: "indexnow-key" };
+    case "/favicon.svg":
+    case "/favicon.ico":
+      // Browsers probe /favicon.ico regardless of what the page declares, and a
+      // 404 there is a wasted request on every visit. Serve the SVG for both.
+      return { kind: "favicon" };
     case "/":
     case "/index.html":
       return wantsHtml ? { kind: "landing" } : { kind: "json" };
