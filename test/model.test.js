@@ -45,8 +45,9 @@ check("ping does reply", handleRpc({ jsonrpc: "2.0", id: 2, method: "ping" }).re
 
 section("3. Tool listing");
 const list = handleRpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
-check("lists three tools", list.result.tools.length, 3);
-check("names are stable", list.result.tools.map((t) => t.name), ["screenshot_url", "rendered_html", "url_to_pdf"]);
+check("lists four tools", list.result.tools.length, 4);
+check("names are stable", list.result.tools.map((t) => t.name),
+  ["screenshot_url", "rendered_html", "page_diagnostics", "url_to_pdf"]);
 for (const t of TOOLS) {
   check(`${t.name} requires a url`, t.inputSchema.required, ["url"]);
   check(`${t.name} has a description an agent can act on`, t.description.length > 80, true);
@@ -118,7 +119,33 @@ check("unknown method is -32601", handleRpc({ jsonrpc: "2.0", id: 12, method: "n
 check("malformed request is -32600", handleRpc({ foo: "bar" }).error.code, -32600);
 check("wrong jsonrpc version is rejected", handleRpc({ jsonrpc: "1.0", id: 1, method: "ping" }).error.code, -32600);
 
-section("8. Numeric clamping");
+section("8. page_diagnostics routes and validates like the others");
+const diag = handleRpc({
+  jsonrpc: "2.0",
+  id: 40,
+  method: "tools/call",
+  params: { name: "page_diagnostics", arguments: { url: "https://example.com", include_warnings: true } }
+});
+check("defers to page_diagnostics", diag.defer, "page_diagnostics");
+check("url is validated and normalised", diag.args.url, "https://example.com/");
+check("include_warnings survives", diag.args.include_warnings, true);
+
+const diagSsrf = handleRpc({
+  jsonrpc: "2.0",
+  id: 41,
+  method: "tools/call",
+  params: { name: "page_diagnostics", arguments: { url: "http://192.168.0.1/router" } }
+});
+check("SSRF guard applies to the new tool too", diagSsrf.result.isError, true);
+
+const diagTool = TOOLS.find((t) => t.name === "page_diagnostics");
+check("declares include_warnings", typeof diagTool.inputSchema.properties.include_warnings, "object");
+check("declares width and height",
+  [typeof diagTool.inputSchema.properties.width, typeof diagTool.inputSchema.properties.height],
+  ["object", "object"]);
+check("description tells an agent when to reach for it", diagTool.description.includes("broken"), true);
+
+section("9. Numeric clamping");
 check("in range passes through", clampNumber(800, 320, 2560, 1280), 800);
 check("below min clamps up", clampNumber(10, 320, 2560, 1280), 320);
 check("above max clamps down", clampNumber(99999, 320, 2560, 1280), 2560);
