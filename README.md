@@ -76,6 +76,25 @@ The DOM *after* JavaScript has executed. Returns HTML text.
 
 Good for: single-page apps, anything where a plain fetch returns a shell.
 
+### `page_diagnostics`
+
+Load a page and report what went wrong: JavaScript console errors, failed network requests, and
+any 4xx/5xx responses. Returns a readable summary.
+
+| Argument | Type | Notes |
+|---|---|---|
+| `url` | string | **Required.** Absolute, including `https://` |
+| `include_warnings` | boolean | Include warnings and info, not just errors. Default `false` |
+| `width` | number | Viewport width, 320–2560. Default `1280` |
+| `height` | number | Viewport height, 240–2000. Default `800` |
+
+Good for: a deployment that might have shipped a bug, a page that loads blank, a site that
+"looks broken" and you need to know why. **An agent cannot see a browser console any other way.**
+
+Playwright MCP can do this too — but it must be installed locally, with Node and browser
+binaries present, and its HTTP mode has known session bugs. This runs hosted, stateless, with
+nothing to install.
+
 ### `url_to_pdf`
 
 Render a page to PDF as a browser would print it.
@@ -110,7 +129,7 @@ launches a browser, does the work, and closes it.
 
 ```bash
 npm install
-npm test        # 55 tests, no network or browser needed
+npm test        # 64 tests, no network or browser needed
 npm run dev     # local worker
 npm run deploy  # to Cloudflare
 ```
