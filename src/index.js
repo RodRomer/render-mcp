@@ -226,9 +226,20 @@ async function runTool(name, args, env) {
       lines.push("");
 
       if (results.violations.length === 0) {
-        lines.push("No automated violations found. Automated testing catches roughly a third of");
-        lines.push("accessibility problems — keyboard navigation and screen-reader behaviour still");
-        lines.push("need a human.");
+        lines.push(`No violations found in the ${standard} ruleset.`);
+        lines.push("");
+        // A narrow ruleset returning zero is easy to misread as "this page is fine".
+        // Say plainly what was not checked.
+        if (standard !== "all") {
+          lines.push(
+            `Note: ${standard} is a narrow filter and ran only ${results.passCount} rules. It excludes ` +
+            "best-practice checks such as landmarks and heading order, which commonly fail on pages that " +
+            "pass WCAG AA. Re-run with standard=\"all\" for the full picture."
+          );
+          lines.push("");
+        }
+        lines.push("Automated testing catches roughly a third of accessibility problems either way —");
+        lines.push("keyboard navigation and screen-reader behaviour still need a human.");
       } else {
         results.violations.slice(0, maxViolations).forEach((v) => {
           lines.push(`[${(v.impact || "unknown").toUpperCase()}] ${v.help}`);
