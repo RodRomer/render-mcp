@@ -1,13 +1,13 @@
 {
   "name": "render-mcp",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "An MCP server that gives AI agents a real browser: screenshots, PDFs, and post-JavaScript HTML. No API key required.",
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node test/model.test.js",
+    "test": "node test/model.test.js && node test/usage.test.js",
     "test:dom": "powershell -ExecutionPolicy Bypass -File test/run.ps1 -SourceFile src/inspect-page.js -TestFile test/dom.test.js",
     "test:nonode": "powershell -ExecutionPolicy Bypass -File test/run.ps1"
   },
