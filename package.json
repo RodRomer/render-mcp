@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "test": "node test/model.test.js && node test/usage.test.js && node test/invariants.test.js && node test/landing.test.js && node test/routes.test.js",
+    "test": "node test/model.test.js && node test/usage.test.js && node test/invariants.test.js && node test/landing.test.js && node test/routes.test.js && node test/plugin.test.js",
     "test:dom": "powershell -ExecutionPolicy Bypass -File test/run.ps1 -SourceFile src/inspect-page.js -TestFile test/dom.test.js",
     "test:nonode": "powershell -ExecutionPolicy Bypass -File test/run.ps1"
   },
