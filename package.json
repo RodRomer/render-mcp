@@ -1,0 +1,18 @@
+{
+  "name": "render-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "An MCP server that gives AI agents a real browser: screenshots, PDFs, and post-JavaScript HTML. No API key required.",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node test/model.test.js"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "^1.0.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.128.0"
+  }
+}
