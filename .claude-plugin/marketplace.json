@@ -1,0 +1,11 @@
+{
+  "name": "render-mcp",
+  "owner": { "name": "RodRomer" },
+  "plugins": [
+    {
+      "name": "render",
+      "source": "./plugins/render",
+      "description": "A real browser for AI agents: screenshots, post-JavaScript HTML, console diagnostics, WCAG audits and computed styles. Hosted, so there is nothing to install and no API key."
+    }
+  ]
+}
