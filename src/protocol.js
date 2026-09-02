@@ -11,7 +11,7 @@ export const PROTOCOL_VERSION = "2025-06-18";
 export const SERVER_INFO = {
   name: "render-mcp",
   title: "Render — a real browser for agents",
-  version: "0.1.0"
+  version: "0.4.0"
 };
 
 /** Tool definitions, exactly as advertised over MCP. */
@@ -113,6 +113,33 @@ export const TOOLS = [
     }
   },
   {
+    name: "inspect_element",
+    description:
+      "Answer 'why isn't this element showing where I expect?' for a CSS selector on a live page. " +
+      "Returns the resolved box model, computed display/visibility/opacity/position/z-index, colours, " +
+      "whether the element is inside the viewport, and — crucially — whether another element is covering " +
+      "it. These are the values a browser computes after the full cascade and layout; they cannot be " +
+      "derived from reading HTML and CSS.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The absolute URL to load, including https://" },
+        selector: {
+          type: "string",
+          description: "CSS selector for the element to inspect, for example '.buy-button' or '#header nav a'"
+        },
+        max_matches: {
+          type: "number",
+          description: "How many matching elements to report. 1-10. Defaults to 3.",
+          default: 3
+        },
+        width: { type: "number", description: "Viewport width in pixels. 320-2560. Defaults to 1280.", default: 1280 },
+        height: { type: "number", description: "Viewport height in pixels. 240-2000. Defaults to 800.", default: 800 }
+      },
+      required: ["url", "selector"]
+    }
+  },
+  {
     name: "url_to_pdf",
     description:
       "Render a web page to PDF exactly as a browser would print it. Use this to archive a page, produce a " +
@@ -174,6 +201,21 @@ export function validateUrl(raw) {
     }
   }
   return { ok: true, url: u.toString() };
+}
+
+/**
+ * A CSS selector argument must be present and non-empty. Whether it is *valid*
+ * CSS can only be settled by a real parser, so that is checked in the browser
+ * and reported as a readable failure rather than guessed at here.
+ */
+export function validateSelector(raw) {
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { ok: false, error: "A selector is required, for example \".buy-button\" or \"#main nav a\"." };
+  }
+  if (raw.length > 500) {
+    return { ok: false, error: "That selector is unreasonably long (over 500 characters)." };
+  }
+  return { ok: true, selector: raw.trim() };
 }
 
 /** Clamp a numeric argument into a supported range, falling back to a default. */
@@ -242,7 +284,20 @@ export function handleRpc(req) {
         // Tool-level failures are results with isError, not protocol errors.
         return jsonRpcResult(id, { content: [{ type: "text", text: check.error }], isError: true });
       }
-      return { defer: name, args: { ...(params?.arguments || {}), url: check.url }, id };
+      const args = { ...(params?.arguments || {}), url: check.url };
+
+      // Tools that need more than a url declare it in their schema; enforce it
+      // here so a missing argument is one readable message, not a browser launch
+      // that fails halfway.
+      if (tool.inputSchema.required.includes("selector")) {
+        const sel = validateSelector(args.selector);
+        if (!sel.ok) {
+          return jsonRpcResult(id, { content: [{ type: "text", text: sel.error }], isError: true });
+        }
+        args.selector = sel.selector;
+      }
+
+      return { defer: name, args, id };
     }
 
     default:
