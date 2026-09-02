@@ -51,6 +51,9 @@ check("has a name", typeof marketplace.name, "string");
 check("names an owner", typeof marketplace.owner.name, "string");
 check("lists exactly one plugin", marketplace.plugins.length, 1);
 check("the name is kebab-case with no spaces", /^[a-z0-9-]+$/.test(marketplace.name), true);
+// `claude plugin validate` warns when this is absent, and the review pipeline
+// runs that same check. Found by running the official validator, not by reading.
+check("the marketplace itself has a description", (marketplace.description || "").length > 30, true);
 
 section("3. The catalog entry and the plugin manifest agree");
 // A mismatch here is an install failure on a stranger's machine.
