@@ -1,0 +1,7 @@
+runtime: "remote"
+startCommand:
+  type: "http"
+  url: "https://render.makermargins.com/mcp"
+description: >-
+  Gives an AI agent a real browser. Screenshots, PDFs, and the HTML a page
+  produces after JavaScript has run. No API key, no signup, no account.
