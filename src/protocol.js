@@ -61,6 +61,28 @@ export const TOOLS = [
     }
   },
   {
+    name: "page_diagnostics",
+    description:
+      "Load a page in a real browser and report what went wrong: JavaScript console errors and warnings, " +
+      "network requests that failed, and the HTTP status of the page itself. Use this when a site looks " +
+      "broken, a deployment might have shipped a bug, or a page loads blank and you need to know why. " +
+      "An agent cannot see a browser's console any other way.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        url: { type: "string", description: "The absolute URL to load, including https://" },
+        include_warnings: {
+          type: "boolean",
+          description: "Include console warnings and info messages, not just errors. Defaults to false.",
+          default: false
+        },
+        width: { type: "number", description: "Viewport width in pixels. 320-2560. Defaults to 1280.", default: 1280 },
+        height: { type: "number", description: "Viewport height in pixels. 240-2000. Defaults to 800.", default: 800 }
+      },
+      required: ["url"]
+    }
+  },
+  {
     name: "url_to_pdf",
     description:
       "Render a web page to PDF exactly as a browser would print it. Use this to archive a page, produce a " +
