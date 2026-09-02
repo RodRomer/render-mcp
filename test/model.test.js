@@ -8,6 +8,7 @@ import {
   handleRpc,
   validateUrl,
   validateSelector,
+  classifyFailure,
   clampNumber,
   TOOLS,
   PROTOCOL_VERSION,
@@ -232,7 +233,49 @@ check("description names the covering check, its real differentiator",
 check("description says these values cannot be derived from source",
   inspTool.description.includes("cannot be derived"), true);
 
-section("11. Numeric clamping");
+section("11. Failure classification — our fault vs the page's fault");
+// The expensive mistake is blaming a good URL for our own rate limit: an agent
+// that believes a URL is broken stops trying it.
+const cap = classifyFailure("Error: 429 Too Many Requests", "https://example.com/");
+check("a 429 is our capacity, not the page", cap.label, "capacity");
+check("  and is marked as our fault", cap.ours, true);
+check("  and says explicitly that the URL is fine", cap.message.includes("Nothing is wrong with the URL"), true);
+check("'unable to create new browser' is capacity",
+  classifyFailure("unable to create new browser", "https://x.com/").label, "capacity");
+check("a concurrency limit is capacity",
+  classifyFailure("Too many concurrent sessions", "https://x.com/").label, "capacity");
+
+check("a DNS failure blames the hostname",
+  classifyFailure("net::ERR_NAME_NOT_RESOLVED at https://nope.invalid", "https://nope.invalid/").label, "dns");
+check("a certificate failure is its own case",
+  classifyFailure("net::ERR_CERT_DATE_INVALID", "https://x.com/").label, "tls");
+check("a navigation timeout is the page's problem",
+  classifyFailure("Navigation timeout of 20000 ms exceeded", "https://x.com/").label, "timeout");
+check("  and is not marked as our fault",
+  classifyFailure("Navigation timeout of 20000 ms exceeded", "https://x.com/").ours, false);
+check("anything unrecognised falls back to a page error",
+  classifyFailure("something entirely new", "https://x.com/").label, "page_error");
+check("  and still quotes the underlying error",
+  classifyFailure("something entirely new", "https://x.com/").message.includes("something entirely new"), true);
+
+// Capacity must win over any other pattern in the same message, or a rate-limited
+// request that happens to mention a timeout gets blamed on the page.
+check("capacity beats timeout when both appear",
+  classifyFailure("429 rate limit — navigation timeout", "https://x.com/").label, "capacity");
+
+check("a null error does not throw", classifyFailure(null, "https://x.com/").label, "page_error");
+check("an undefined error does not throw", classifyFailure(undefined, "https://x.com/").label, "page_error");
+check("every branch names the url",
+  ["capacity", "dns", "tls", "timeout", "page_error"].every((_, i) =>
+    [
+      classifyFailure("429", "https://u/"),
+      classifyFailure("ERR_NAME_NOT_RESOLVED", "https://u/"),
+      classifyFailure("ERR_CERT_AUTHORITY_INVALID", "https://u/"),
+      classifyFailure("timed out", "https://u/"),
+      classifyFailure("???", "https://u/")
+    ][i].message.includes("https://u/")), true);
+
+section("12. Numeric clamping");
 check("in range passes through", clampNumber(800, 320, 2560, 1280), 800);
 check("below min clamps up", clampNumber(10, 320, 2560, 1280), 320);
 check("above max clamps down", clampNumber(99999, 320, 2560, 1280), 2560);
