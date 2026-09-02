@@ -90,6 +90,88 @@ async function runTool(name, args, env) {
     }
   }
 
+  if (name === "page_diagnostics") {
+    const width = clampNumber(args.width, 320, 2560, 1280);
+    const height = clampNumber(args.height, 240, 2000, 800);
+    const includeWarnings = args.include_warnings === true;
+
+    const browser = await puppeteer.launch(env.BROWSER);
+    try {
+      const page = await browser.newPage();
+      await page.setViewport({ width, height });
+
+      const console_ = [];
+      const failed = [];
+      const badStatus = [];
+
+      // Listeners must be attached before navigation or early events are missed.
+      page.on("console", (msg) => {
+        const type = msg.type();
+        if (type === "error" || type === "warning" || includeWarnings) {
+          console_.push({ type, text: String(msg.text()).slice(0, 500) });
+        }
+      });
+      page.on("pageerror", (err) => {
+        console_.push({ type: "pageerror", text: String(err?.message || err).slice(0, 500) });
+      });
+      page.on("requestfailed", (req) => {
+        failed.push({
+          url: String(req.url()).slice(0, 300),
+          reason: String(req.failure()?.errorText || "unknown")
+        });
+      });
+      page.on("response", (res) => {
+        const s = res.status();
+        if (s >= 400) { badStatus.push({ url: String(res.url()).slice(0, 300), status: s }); }
+      });
+
+      const response = await page.goto(url, { waitUntil: "networkidle0", timeout: NAV_TIMEOUT_MS });
+      const pageStatus = response ? response.status() : null;
+      const title = await page.title().catch(() => "");
+
+      const errors = console_.filter((c) => c.type === "error" || c.type === "pageerror");
+      const warnings = console_.filter((c) => c.type === "warning");
+
+      const lines = [];
+      lines.push(`Page: ${url}`);
+      lines.push(`HTTP status: ${pageStatus === null ? "unknown" : pageStatus}`);
+      if (title) { lines.push(`Title: ${title}`); }
+      lines.push("");
+
+      if (errors.length === 0 && failed.length === 0 && badStatus.length === 0) {
+        lines.push("No console errors, no failed requests, no 4xx/5xx responses. The page loaded cleanly.");
+      } else {
+        if (errors.length) {
+          lines.push(`Console errors (${errors.length}):`);
+          errors.slice(0, 25).forEach((e) => lines.push(`  - [${e.type}] ${e.text}`));
+          if (errors.length > 25) { lines.push(`  ...and ${errors.length - 25} more`); }
+          lines.push("");
+        }
+        if (failed.length) {
+          lines.push(`Failed requests (${failed.length}):`);
+          failed.slice(0, 25).forEach((f) => lines.push(`  - ${f.reason}  ${f.url}`));
+          if (failed.length > 25) { lines.push(`  ...and ${failed.length - 25} more`); }
+          lines.push("");
+        }
+        if (badStatus.length) {
+          lines.push(`Responses with 4xx/5xx (${badStatus.length}):`);
+          badStatus.slice(0, 25).forEach((b) => lines.push(`  - ${b.status}  ${b.url}`));
+          if (badStatus.length > 25) { lines.push(`  ...and ${badStatus.length - 25} more`); }
+          lines.push("");
+        }
+      }
+
+      if (includeWarnings && warnings.length) {
+        lines.push(`Console warnings (${warnings.length}):`);
+        warnings.slice(0, 25).forEach((w) => lines.push(`  - ${w.text}`));
+      }
+
+      return toolText(lines.join("\n").trim());
+    } finally {
+      await browser.close();
+    }
+  }
+
   if (name === "url_to_pdf") {
     const { browser, page } = await openPage(env, url, 1280, 800);
     try {
