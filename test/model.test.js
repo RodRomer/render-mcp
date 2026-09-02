@@ -45,9 +45,9 @@ check("ping does reply", handleRpc({ jsonrpc: "2.0", id: 2, method: "ping" }).re
 
 section("3. Tool listing");
 const list = handleRpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
-check("lists four tools", list.result.tools.length, 4);
+check("lists five tools", list.result.tools.length, 5);
 check("names are stable", list.result.tools.map((t) => t.name),
-  ["screenshot_url", "rendered_html", "page_diagnostics", "url_to_pdf"]);
+  ["screenshot_url", "rendered_html", "page_diagnostics", "accessibility_audit", "url_to_pdf"]);
 for (const t of TOOLS) {
   check(`${t.name} requires a url`, t.inputSchema.required, ["url"]);
   check(`${t.name} has a description an agent can act on`, t.description.length > 80, true);
@@ -145,7 +145,31 @@ check("declares width and height",
   ["object", "object"]);
 check("description tells an agent when to reach for it", diagTool.description.includes("broken"), true);
 
-section("9. Numeric clamping");
+section("9. accessibility_audit");
+const a11y = handleRpc({
+  jsonrpc: "2.0",
+  id: 50,
+  method: "tools/call",
+  params: { name: "accessibility_audit", arguments: { url: "https://example.com", standard: "wcag21aa" } }
+});
+check("defers to accessibility_audit", a11y.defer, "accessibility_audit");
+check("standard survives", a11y.args.standard, "wcag21aa");
+
+const a11ySsrf = handleRpc({
+  jsonrpc: "2.0",
+  id: 51,
+  method: "tools/call",
+  params: { name: "accessibility_audit", arguments: { url: "http://10.1.2.3/internal" } }
+});
+check("SSRF guard covers it", a11ySsrf.result.isError, true);
+
+const a11yTool = TOOLS.find((t) => t.name === "accessibility_audit");
+check("offers a bounded set of rulesets",
+  a11yTool.inputSchema.properties.standard.enum, ["wcag2a", "wcag2aa", "wcag21aa", "all"]);
+check("defaults to the legal benchmark", a11yTool.inputSchema.properties.standard.default, "wcag2aa");
+check("description names the real differentiator", a11yTool.description.includes("contrast"), true);
+
+section("10. Numeric clamping");
 check("in range passes through", clampNumber(800, 320, 2560, 1280), 800);
 check("below min clamps up", clampNumber(10, 320, 2560, 1280), 320);
 check("above max clamps down", clampNumber(99999, 320, 2560, 1280), 2560);
