@@ -160,14 +160,36 @@ agent can route around them rather than crashing.
 
 ## Privacy
 
-Nothing is stored. No logging of URLs, no retention of rendered output, no analytics. Each call
-launches a browser, does the work, and closes it.
+**URLs and page content are never stored or logged.** Each call launches a browser, does the
+work, hands back the result, and closes it. Nothing about *what* you asked for is retained.
+
+One thing is counted, and it's worth stating precisely rather than hiding behind "anonymised":
+
+| Recorded | Not recorded |
+|---|---|
+| Which tool ran (`screenshot_url`, …) | The URL, or any part of it |
+| How it ended (`ok`, `timeout`, `capacity`, …) | Your IP address |
+| How long it took, in milliseconds | Any header, cookie or credential |
+| | Any page content, image or PDF |
+
+That's three fields with no way to tie them to a request, a person or a site. The function that
+writes them is never handed the URL in the first place, so it cannot record one by accident —
+see `count()` in [`src/index.js`](src/index.js).
+
+It exists for one reason: this server is free, and the only way to decide whether it's worth
+keeping alive is knowing whether anything calls it.
+
+The counts are public — no login, no dashboard:
+
+```
+https://render.makermargins.com/stats
+```
 
 ## Development
 
 ```bash
 npm install
-npm test          # 97 protocol tests, no network or browser needed
+npm test          # 151 tests (protocol + usage), no network or browser needed
 npm run test:dom  # 39 DOM tests, headless Edge/Chrome, no network
 npm run dev       # local worker
 npm run deploy    # to Cloudflare
