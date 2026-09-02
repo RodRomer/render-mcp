@@ -96,8 +96,10 @@ export const TOOLS = [
         standard: {
           type: "string",
           description:
-            "Which ruleset to run: 'wcag2a', 'wcag2aa' (the usual legal benchmark), 'wcag21aa', or 'all'. " +
-            "Defaults to wcag2aa.",
+            "Which ruleset to run. 'wcag2aa' is the usual legal benchmark but is a narrow filter — it " +
+            "excludes best-practice checks such as landmarks and heading order, so a page can return zero " +
+            "violations and still have real problems. Use 'all' when the question is \"is this page " +
+            "accessible?\" rather than \"does it meet WCAG AA?\". Defaults to wcag2aa.",
           enum: ["wcag2a", "wcag2aa", "wcag21aa", "all"],
           default: "wcag2aa"
         },
