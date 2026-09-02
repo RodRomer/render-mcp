@@ -7,6 +7,7 @@
 import {
   handleRpc,
   validateUrl,
+  validateSelector,
   clampNumber,
   TOOLS,
   PROTOCOL_VERSION,
@@ -45,11 +46,16 @@ check("ping does reply", handleRpc({ jsonrpc: "2.0", id: 2, method: "ping" }).re
 
 section("3. Tool listing");
 const list = handleRpc({ jsonrpc: "2.0", id: 3, method: "tools/list" });
-check("lists five tools", list.result.tools.length, 5);
+check("lists six tools", list.result.tools.length, 6);
 check("names are stable", list.result.tools.map((t) => t.name),
-  ["screenshot_url", "rendered_html", "page_diagnostics", "accessibility_audit", "url_to_pdf"]);
+  ["screenshot_url", "rendered_html", "page_diagnostics", "accessibility_audit",
+   "inspect_element", "url_to_pdf"]);
 for (const t of TOOLS) {
-  check(`${t.name} requires a url`, t.inputSchema.required, ["url"]);
+  // Every tool needs a url; some need more. Assert the url specifically rather
+  // than the whole array, so adding an argument to one tool doesn't fail here.
+  check(`${t.name} requires a url`, t.inputSchema.required.includes("url"), true);
+  check(`${t.name} declares every required arg in its schema`,
+    t.inputSchema.required.every((r) => typeof t.inputSchema.properties[r] === "object"), true);
   check(`${t.name} has a description an agent can act on`, t.description.length > 80, true);
 }
 
@@ -169,7 +175,64 @@ check("offers a bounded set of rulesets",
 check("defaults to the legal benchmark", a11yTool.inputSchema.properties.standard.default, "wcag2aa");
 check("description names the real differentiator", a11yTool.description.includes("contrast"), true);
 
-section("10. Numeric clamping");
+section("10. inspect_element — the selector argument is a second boundary");
+const insp = handleRpc({
+  jsonrpc: "2.0",
+  id: 60,
+  method: "tools/call",
+  params: { name: "inspect_element", arguments: { url: "https://example.com", selector: "  .buy-button  " } }
+});
+check("defers to inspect_element", insp.defer, "inspect_element");
+check("trims the selector", insp.args.selector, ".buy-button");
+check("url still validated and normalised", insp.args.url, "https://example.com/");
+
+const noSel = handleRpc({
+  jsonrpc: "2.0",
+  id: 61,
+  method: "tools/call",
+  params: { name: "inspect_element", arguments: { url: "https://example.com" } }
+});
+check("a missing selector fails before any browser launch", noSel.result.isError, true);
+check("  and says what a selector looks like", noSel.result.content[0].text.includes("buy-button"), true);
+check("  and never reaches the deferral path", noSel.defer, undefined);
+
+check("an empty selector is refused",
+  handleRpc({ jsonrpc: "2.0", id: 62, method: "tools/call",
+    params: { name: "inspect_element", arguments: { url: "https://example.com", selector: "   " } } }
+  ).result.isError, true);
+check("a non-string selector is refused",
+  handleRpc({ jsonrpc: "2.0", id: 63, method: "tools/call",
+    params: { name: "inspect_element", arguments: { url: "https://example.com", selector: 42 } } }
+  ).result.isError, true);
+check("an absurdly long selector is refused",
+  validateSelector("a".repeat(501)).ok, false);
+check("a 500-char selector is still allowed", validateSelector("a".repeat(500)).ok, true);
+
+// Order matters: a bad url must be reported even when the selector is also bad,
+// because the url is the security boundary and should never be attempted.
+const bothBad = handleRpc({
+  jsonrpc: "2.0",
+  id: 64,
+  method: "tools/call",
+  params: { name: "inspect_element", arguments: { url: "http://169.254.169.254/", selector: "" } }
+});
+check("SSRF is checked before the selector", bothBad.result.content[0].text.includes("private network"), true);
+
+check("selector validation passes a plain selector", validateSelector("#main nav a").selector, "#main nav a");
+check("other tools are unaffected by the selector rule",
+  handleRpc({ jsonrpc: "2.0", id: 65, method: "tools/call",
+    params: { name: "screenshot_url", arguments: { url: "https://example.com" } } }
+  ).defer, "screenshot_url");
+
+const inspTool = TOOLS.find((t) => t.name === "inspect_element");
+check("requires both url and selector", inspTool.inputSchema.required, ["url", "selector"]);
+check("declares max_matches", typeof inspTool.inputSchema.properties.max_matches, "object");
+check("description names the covering check, its real differentiator",
+  inspTool.description.includes("covering"), true);
+check("description says these values cannot be derived from source",
+  inspTool.description.includes("cannot be derived"), true);
+
+section("11. Numeric clamping");
 check("in range passes through", clampNumber(800, 320, 2560, 1280), 800);
 check("below min clamps up", clampNumber(10, 320, 2560, 1280), 320);
 check("above max clamps down", clampNumber(99999, 320, 2560, 1280), 2560);
