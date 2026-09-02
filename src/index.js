@@ -261,7 +261,10 @@ async function runTool(name, args, env) {
         }
       }
 
-      return toolText(lines.join("\n").trim());
+      // The violation samples are verbatim HTML lifted from the page, so this
+      // report carries attacker-controllable markup even though axe's rule names
+      // and the surrounding structure are ours.
+      return toolText(wrapUntrusted(lines.join("\n").trim(), url, "accessibility report"));
     } finally {
       await browser.close();
     }
@@ -323,7 +326,10 @@ async function runTool(name, args, env) {
         "shows. They cannot be derived by reading the HTML and CSS."
       );
 
-      return toolText(lines.join("\n").trim());
+      // Element descriptors are built from the page's own id and class attributes,
+      // which whoever controls the page chooses. The measurements are ours; the
+      // names in them are not.
+      return toolText(wrapUntrusted(lines.join("\n").trim(), url, "element inspection"));
     } finally {
       await browser.close();
     }
