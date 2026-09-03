@@ -83,6 +83,46 @@ check("version tracks the server", lhm.version, SERVER_INFO.version);
 check("carries a substantial description", lhm.description.length > 60, true);
 check("name is set", lhm.name.length > 0, true);
 
+section("4c. The official registry manifest (server.json)");
+// This file was the one version surface NOT covered here, and it drifted: while
+// plugin.json and lhm.plugin.json listed all six capabilities, server.json still
+// advertised "screenshots, PDFs, post-JS HTML" — the three things ~300 other
+// registry servers already do — and named none of the three that a full census of
+// 26,493 live servers showed almost nobody else offers.
+//
+// The cause is structural and worth naming: server.json's description is capped at
+// 100 characters by the registry schema, so it is the only manifest forced to
+// *choose* what to lead with. The unconstrained files never had to, so they never
+// went wrong. A cap turns an omission into a decision.
+const server = read("server.json");
+check("version matches the server's", server.version, SERVER_INFO.version);
+check("registry name is the io.github form", server.name, "io.github.RodRomer/render-mcp");
+// Hard schema limit. Exceeding it is rejected at publish time, in CI, after a push.
+check("description is within the schema's 100-char cap", server.description.length <= 100, true);
+check("description is not empty", server.description.length >= 1, true);
+// Positioning, corrected by verdict 82 after measuring npm rather than the registry.
+//
+// The first version of this test asserted we lead with console/element/WCAG, on the
+// belief those capabilities were scarce. They are not: Google's chrome-devtools-mcp
+// (10M npm downloads/month, 29 tools) and Microsoft's @playwright/mcp (24M/month,
+// 24 tools) both do all of them, and both are better resourced than we will ever be.
+// Leading on capability is leading with our weakest hand.
+//
+// What neither can offer is running with nothing installed. Playwright MCP needs npx,
+// Node and browser binaries; chrome-devtools-mcp needs a local Chrome. That property
+// is structural, not a feature they can ship, so it is what the description leads on.
+check("leads with the hosted / zero-install property, not a capability",
+  /^hosted|no install|nothing to install/i.test(server.description), true);
+// Capability words still have to appear: descriptions are what keyword search matches,
+// and this field is the only indexed text the registry holds.
+check("still carries capability keywords for search",
+  /screenshot|console|DOM|WCAG/i.test(server.description), true);
+check("states the keyless property", /no API key|keyless/i.test(server.description), true);
+check("points the website at the human landing page, not the repo",
+  server.websiteUrl, "https://render.makermargins.com/");
+check("declares the streamable-http remote", server.remotes[0].url,
+  "https://render.makermargins.com/mcp");
+
 section("5. The MCP server declaration");
 const servers = Object.keys(mcp.mcpServers);
 check("declares exactly one server", servers.length, 1);

@@ -24,6 +24,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { TOOLS } from "../src/protocol.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const src = readFileSync(join(here, "..", "src", "index.js"), "utf8");
@@ -95,6 +96,33 @@ section("5. Every tool closes the browser it opened");
 for (const tool of KNOWN) {
   check(`${tool} closes the browser in a finally block`,
     /finally\s*\{\s*await browser\.close\(\);/.test(blocks[tool]), true);
+}
+
+section("5b. Every advertised tool carries MCP annotations");
+// Added after verdict 83. Two independent reasons, and the second is the one that
+// matters day to day:
+//
+//   1. Anthropic's Connectors Directory requires that "all tools must include a
+//      `title` and the applicable `readOnlyHint` or `destructiveHint`", and names
+//      missing annotations as a top cause of rejection.
+//   2. More importantly, `readOnlyHint` is how a client decides whether a call
+//      needs a human to approve it. Without it, every one of these six tools looks
+//      potentially destructive, so a cautious client prompts before each call —
+//      which is precisely the friction this server exists to remove. Shipping six
+//      unannotated read-only tools was working against our own premise.
+//
+// All six only fetch and render; none writes anything anywhere. openWorldHint is
+// true because they reach arbitrary public URLs.
+for (const tool of TOOLS) {
+  const a = tool.annotations || {};
+  check(`${tool.name} has a human-readable title`,
+    typeof a.title === "string" && a.title.length > 3, true);
+  check(`${tool.name} declares itself read-only`, a.readOnlyHint, true);
+  check(`${tool.name} declares it reaches the open web`, a.openWorldHint, true);
+  // destructiveHint is only meaningful when readOnlyHint is false; asserting its
+  // absence keeps the annotation set honest rather than decorative.
+  check(`${tool.name} does not also claim to be destructive`,
+    a.destructiveHint === undefined || a.destructiveHint === false, true);
 }
 
 section("6. Every tool call is counted");

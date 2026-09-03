@@ -96,11 +96,16 @@ any 4xx/5xx responses. Returns a readable summary.
 | `height` | number | Viewport height, 240–2000. Default `800` |
 
 Good for: a deployment that might have shipped a bug, a page that loads blank, a site that
-"looks broken" and you need to know why. **An agent cannot see a browser console any other way.**
+"looks broken" and you need to know why.
 
-Playwright MCP can do this too — but it must be installed locally, with Node and browser
-binaries present, and its HTTP mode has known session bugs. This runs hosted, stateless, with
-nothing to install.
+**Stated honestly:** this is not a rare capability. Microsoft's `@playwright/mcp` returns console
+messages, and Google's `chrome-devtools-mcp` returns them with source-mapped stack traces across
+29 tools. Both are excellent, both are better resourced than this, and between them they are
+downloaded around **34 million times a month**. If you can run a local process, use one of them.
+
+The one thing neither can do is run where nothing can be installed. They need `npx`, Node, and
+browser binaries, or a local Chrome. This needs a URL. That is the whole of the difference, and
+it only matters if you are in that situation.
 
 ### `inspect_element`
 

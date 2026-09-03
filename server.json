@@ -1,17 +1,17 @@
 {
-    "$schema":  "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
-    "name":  "io.github.RodRomer/render-mcp",
-    "description":  "A real browser for AI agents: screenshots, PDFs, post-JS HTML. No API key.",
-    "version":  "0.7.3",
-    "websiteUrl":  "https://github.com/RodRomer/render-mcp",
-    "repository":  {
-                       "url":  "https://github.com/RodRomer/render-mcp",
-                       "source":  "github"
-                   },
-    "remotes":  [
-                    {
-                        "type":  "streamable-http",
-                        "url":  "https://render.makermargins.com/mcp"
-                    }
-                ]
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.RodRomer/render-mcp",
+  "description": "Hosted browser for AI agents: screenshots, post-JS DOM, console, WCAG. No install, no API key.",
+  "version": "0.7.4",
+  "websiteUrl": "https://render.makermargins.com/",
+  "repository": {
+    "url": "https://github.com/RodRomer/render-mcp",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://render.makermargins.com/mcp"
+    }
+  ]
 }

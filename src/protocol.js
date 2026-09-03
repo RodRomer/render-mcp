@@ -11,13 +11,14 @@ export const PROTOCOL_VERSION = "2025-06-18";
 export const SERVER_INFO = {
   name: "render-mcp",
   title: "Render — a real browser for agents",
-  version: "0.7.3"
+  version: "0.7.4"
 };
 
 /** Tool definitions, exactly as advertised over MCP. */
 export const TOOLS = [
   {
     name: "screenshot_url",
+    annotations: { title: "Screenshot a page", readOnlyHint: true, openWorldHint: true },
     description:
       "Take a screenshot of a web page as it actually renders in a real browser, after JavaScript has run. " +
       "Use this when you need to see a page rather than read it — checking a layout, confirming a site is up " +
@@ -39,6 +40,7 @@ export const TOOLS = [
   },
   {
     name: "rendered_html",
+    annotations: { title: "Get HTML after JavaScript", readOnlyHint: true, openWorldHint: true },
     description:
       "Fetch a page's HTML *after* JavaScript has executed. Use this when a plain HTTP fetch returns an empty " +
       "shell or a loading spinner — single-page apps, sites that build their content client-side, or anything " +
@@ -62,6 +64,7 @@ export const TOOLS = [
   },
   {
     name: "page_diagnostics",
+    annotations: { title: "Diagnose a broken page", readOnlyHint: true, openWorldHint: true },
     description:
       "Load a page in a real browser and report what went wrong: JavaScript console errors and warnings, " +
       "network requests that failed, and the HTTP status of the page itself. Use this when a site looks " +
@@ -84,6 +87,7 @@ export const TOOLS = [
   },
   {
     name: "accessibility_audit",
+    annotations: { title: "Audit a page against WCAG", readOnlyHint: true, openWorldHint: true },
     description:
       "Run a WCAG accessibility audit on a page using axe-core in a real browser, and report the violations " +
       "with the elements responsible. Because it runs against a genuinely rendered page, colour-contrast and " +
@@ -114,6 +118,7 @@ export const TOOLS = [
   },
   {
     name: "inspect_element",
+    annotations: { title: "Inspect why an element is hidden", readOnlyHint: true, openWorldHint: true },
     description:
       "Answer 'why isn't this element showing where I expect?' for a CSS selector on a live page. " +
       "Returns the resolved box model, computed display/visibility/opacity/position/z-index, colours, " +
@@ -141,6 +146,7 @@ export const TOOLS = [
   },
   {
     name: "url_to_pdf",
+    annotations: { title: "Save a page as PDF", readOnlyHint: true, openWorldHint: true },
     description:
       "Render a web page to PDF exactly as a browser would print it. Use this to archive a page, produce a " +
       "document from a rendered report, or capture something for a record. Returns a PDF file.",

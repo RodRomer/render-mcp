@@ -33,7 +33,7 @@ function esc(s) {
 const BLURBS = {
   screenshot_url: "See a page as a person would, after JavaScript has run.",
   rendered_html: "The DOM after JavaScript — for single-page apps that return an empty shell.",
-  page_diagnostics: "Console errors, failed requests and bad statuses. An agent cannot see a browser console any other way.",
+  page_diagnostics: "Console errors, failed requests and bad statuses, without installing anything.",
   accessibility_audit: "axe-core in a real browser, so colour-contrast rules actually fire.",
   inspect_element: "Why an element isn't showing: box model, computed styles, and what's covering it.",
   url_to_pdf: "The page as a browser would print it."
@@ -142,8 +142,11 @@ export function landingPage(tools) {
     <p>If a screenshot is genuinely all you need, use one &mdash; several are free and need no
     signup, and they will beat this on formats and options. The difference is the other three
     tools: reading a browser's console, auditing a rendered page against WCAG, and resolving why
-    an element isn't visible. Those need a real layout engine, and an agent has no way to reach
-    one.</p>
+    an element isn't visible. Those need a real layout engine, which a fetch cannot give you.</p>
+    <p>Two excellent servers already do all of that &mdash; Microsoft's Playwright MCP and Google's
+    Chrome DevTools MCP, together downloaded some 34 million times a month. If you can run a local
+    process, use one of them; they are deeper than this and always will be. This exists for the
+    case they cannot cover: <strong>where nothing can be installed at all.</strong></p>
     <p>Other MCP browsers exist too, and they are good. They install locally &mdash; Node, browser
     binaries, absolute paths. This one runs hosted and stateless, which is the difference between
     an agent being able to use it and not.</p>
